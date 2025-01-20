@@ -524,6 +524,24 @@ class CognitoUser {
     return _signInUserSession;
   }
 
+  /// This is used for authenticating the user through the user authentication flow.
+  /// return: Session string
+  Future<String?> signInWithEmailOtp() async {
+    final paramsReq = {
+      'AuthFlow': 'USER_AUTH',
+      'ClientId': pool.getClientId(),
+      'AuthParameters': {
+        'USERNAME': username,
+        'PREFERRED_CHALLENGE': 'EMAIL_OTP',
+      },
+    };
+
+    final data = await client!.request('InitiateAuth',
+        await _analyticsMetadataParamsDecorator.call(paramsReq));
+
+    return data['Session'];
+  }
+
   /// This is used for authenticating the user.
   Future<CognitoUserSession?> authenticateUser(
       AuthenticationDetails authDetails) async {
@@ -826,6 +844,47 @@ class CognitoUser {
         await _analyticsMetadataParamsDecorator.call(params));
 
     return data;
+  }
+
+  /// This is used by the user once he has the responses to a email otp challenge
+  Future<CognitoUserSession?> sendEmailOtpChallengeAnswer(
+    String answerChallenge,
+    String session, [
+    Map<String, String>? validationData,
+  ]) async {
+    final challengeResponses = {
+      'USERNAME': username,
+      'EMAIL_OTP_CODE': answerChallenge,
+    };
+
+    final authenticationHelper =
+        AuthenticationHelper(pool.getUserPoolId().split('_')[1]);
+
+    await getCachedDeviceKeyAndPassword();
+    if (_deviceKey != null) {
+      challengeResponses['DEVICE_KEY'] = _deviceKey;
+    }
+
+    if (_clientSecretHash != null) {
+      challengeResponses['SECRET_HASH'] = _clientSecretHash;
+    }
+
+    final paramsReq = {
+      'ChallengeName': 'EMAIL_OTP',
+      'ChallengeResponses': challengeResponses,
+      'ClientId': pool.getClientId(),
+      'ClientMetadata': validationData,
+      'Session': session,
+    };
+
+    if (getUserContextData() != null) {
+      paramsReq['UserContextData'] = getUserContextData();
+    }
+
+    final data = await client!.request('RespondToAuthChallenge',
+        await _analyticsMetadataParamsDecorator.call(paramsReq));
+
+    return _authenticateUserInternal(data, authenticationHelper);
   }
 
   /// This is used by the user once he has the responses to a custom challenge
