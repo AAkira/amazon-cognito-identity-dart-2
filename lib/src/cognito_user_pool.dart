@@ -107,8 +107,8 @@ class CognitoUserPool {
   /// user name, password, optional user attributes, optional validation data
   /// and optional client metadata.
   Future<CognitoUserPoolData> signUp(
-    String username,
-    String password, {
+    String username, {
+    String? password,
     List<AttributeArg>? userAttributes,
     List<AttributeArg>? validationData,
     Map<String, String>? clientMetadata,
