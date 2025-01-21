@@ -829,6 +829,26 @@ class CognitoUser {
     return true;
   }
 
+  /// TODO: Merge with `confirmRegistration` if possible
+  Future<String?> confirmRegistrationWithEmailOtp(
+    String confirmationCode,
+  ) async {
+    final params = {
+      'ClientId': pool.getClientId(),
+      'ConfirmationCode': confirmationCode,
+      'Username': username,
+    };
+
+    final data = await client!.request(
+        'ConfirmSignUp', await _analyticsMetadataParamsDecorator.call(params));
+
+    try {
+      return data['Session'];
+    } catch (e) {
+      return null;
+    }
+  }
+
   /// This is used by a user to resend a confirmation code
   dynamic resendConfirmationCode() async {
     final params = {
