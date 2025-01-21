@@ -554,6 +554,28 @@ class CognitoUser {
     throw UnimplementedError('Authentication flow type is not supported.');
   }
 
+  /// This is used for authenticating the user with email otp.
+  Future<CognitoUserSession?> authenticateUserWithEmailOtp(
+    String session,
+  ) async {
+    final params = {
+      'AuthFlow': 'USER_AUTH',
+      'ClientId': pool.getClientId(),
+      'AuthParameters': {
+        'USERNAME': username,
+        'PREFERRED_CHALLENGE': 'EMAIL_OTP',
+      },
+      'Session': session,
+    };
+
+    final data = await client!.request('InitiateAuth', params);
+
+    final authenticationHelper =
+        AuthenticationHelper(pool.getUserPoolId().split('_')[1]);
+
+    return _authenticateUserInternal(data, authenticationHelper);
+  }
+
   /// This is used for the user to signOut of the application and clear the cached tokens.
   /// If `revokeRefreshToken` is set to true, it will revoke the refresh token.
   Future<void> signOut({bool revokeRefreshToken = false}) async {
