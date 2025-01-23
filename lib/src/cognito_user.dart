@@ -526,7 +526,7 @@ class CognitoUser {
 
   /// This is used for authenticating the user through the user authentication flow.
   /// return: Session string
-  Future<String?> signInWithEmailOtp() async {
+  Future<String> signInWithEmailOtp() async {
     final paramsReq = {
       'AuthFlow': 'USER_AUTH',
       'ClientId': pool.getClientId(),
