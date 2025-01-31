@@ -524,6 +524,24 @@ class CognitoUser {
     return _signInUserSession;
   }
 
+  /// This is used for authenticating the user through the user authentication flow.
+  /// return: Session string
+  Future<String> signInWithEmailOtp() async {
+    final paramsReq = {
+      'AuthFlow': 'USER_AUTH',
+      'ClientId': pool.getClientId(),
+      'AuthParameters': {
+        'USERNAME': username,
+        'PREFERRED_CHALLENGE': 'EMAIL_OTP',
+      },
+    };
+
+    final data = await client!.request('InitiateAuth',
+        await _analyticsMetadataParamsDecorator.call(paramsReq));
+
+    return data['Session'];
+  }
+
   /// This is used for authenticating the user.
   Future<CognitoUserSession?> authenticateUser(
       AuthenticationDetails authDetails) async {
@@ -534,6 +552,28 @@ class CognitoUser {
       return await _authenticateUserDefaultAuth(authDetails);
     }
     throw UnimplementedError('Authentication flow type is not supported.');
+  }
+
+  /// This is used for authenticating the user with email otp.
+  Future<CognitoUserSession?> authenticateUserWithEmailOtp(
+    String session,
+  ) async {
+    final params = {
+      'AuthFlow': 'USER_AUTH',
+      'ClientId': pool.getClientId(),
+      'AuthParameters': {
+        'USERNAME': username,
+        'PREFERRED_CHALLENGE': 'EMAIL_OTP',
+      },
+      'Session': session,
+    };
+
+    final data = await client!.request('InitiateAuth', params);
+
+    final authenticationHelper =
+        AuthenticationHelper(pool.getUserPoolId().split('_')[1]);
+
+    return _authenticateUserInternal(data, authenticationHelper);
   }
 
   /// This is used for the user to signOut of the application and clear the cached tokens.
@@ -811,6 +851,26 @@ class CognitoUser {
     return true;
   }
 
+  /// TODO: Merge with `confirmRegistration` if possible
+  Future<String?> confirmRegistrationWithEmailOtp(
+    String confirmationCode,
+  ) async {
+    final params = {
+      'ClientId': pool.getClientId(),
+      'ConfirmationCode': confirmationCode,
+      'Username': username,
+    };
+
+    final data = await client!.request(
+        'ConfirmSignUp', await _analyticsMetadataParamsDecorator.call(params));
+
+    try {
+      return data['Session'];
+    } catch (e) {
+      return null;
+    }
+  }
+
   /// This is used by a user to resend a confirmation code
   dynamic resendConfirmationCode() async {
     final params = {
@@ -826,6 +886,47 @@ class CognitoUser {
         await _analyticsMetadataParamsDecorator.call(params));
 
     return data;
+  }
+
+  /// This is used by the user once he has the responses to a email otp challenge
+  Future<CognitoUserSession?> sendEmailOtpChallengeAnswer(
+    String answerChallenge,
+    String session, [
+    Map<String, String>? validationData,
+  ]) async {
+    final challengeResponses = {
+      'USERNAME': username,
+      'EMAIL_OTP_CODE': answerChallenge,
+    };
+
+    final authenticationHelper =
+        AuthenticationHelper(pool.getUserPoolId().split('_')[1]);
+
+    await getCachedDeviceKeyAndPassword();
+    if (_deviceKey != null) {
+      challengeResponses['DEVICE_KEY'] = _deviceKey;
+    }
+
+    if (_clientSecretHash != null) {
+      challengeResponses['SECRET_HASH'] = _clientSecretHash;
+    }
+
+    final paramsReq = {
+      'ChallengeName': 'EMAIL_OTP',
+      'ChallengeResponses': challengeResponses,
+      'ClientId': pool.getClientId(),
+      'ClientMetadata': validationData,
+      'Session': session,
+    };
+
+    if (getUserContextData() != null) {
+      paramsReq['UserContextData'] = getUserContextData();
+    }
+
+    final data = await client!.request('RespondToAuthChallenge',
+        await _analyticsMetadataParamsDecorator.call(paramsReq));
+
+    return _authenticateUserInternal(data, authenticationHelper);
   }
 
   /// This is used by the user once he has the responses to a custom challenge
